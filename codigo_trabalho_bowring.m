@@ -11,9 +11,13 @@ h_dec = geodesica_ini(3);
 a = 6378137;
 e = 0.0818;
 N0 = a/(sqrt(1-e^2*(sind(lat_dec))^2));
-rx(1) = (N0+h_dec)*cosd(lat_dec)*cosd(long_dec);
-ry(1) = (N0+h_dec)*cosd(lat_dec)*sind(long_dec);
-rz(1) = (N0*(1-e^2)+h_dec)*sind(lat_dec);
+x0(1) = (N0+h_dec)*cosd(lat_dec)*cosd(long_dec);
+y0(1) = (N0+h_dec)*cosd(lat_dec)*sind(long_dec);
+z0(1) = (N0*(1-e^2)+h_dec)*sind(lat_dec);
+
+rx(1) = 0;
+ry(1) = 0;
+rz(1) = 0;
 
 #Determinacao das velocidades iniciais
 m = length(ax_ms2);
@@ -72,17 +76,17 @@ for i = 1 : m
           -sind(theta(i))             cosd(theta(i))*sind(phi(i))                                        cosd(theta(i))*cosd(phi(i))]; #matriz de rotacao para os aceler?metros
 
   #7 Determinacao das aceleracaes
-  a = Cn2b * [ax_ms2(i);
+  acc_n = Cn2b * [ax_ms2(i);
               ay_ms2(i);
               az_ms2(i)];
 
   #8 Retirando a gravidade do az
-  a(3) = a(3) - g(i);
+  acc_n(3) = acc_n(3) - g(i);
 
   #9 Determinacao das velocidades
-  vx(i+1) = vx(i) + a(1) * dt(i);
-  vy(i+1) = vy(i) + a(2) * dt(i);
-  vz(i+1) = vz(i) + a(3) * dt(1);
+  vx(i+1) = vx(i) + acc_n(1) * dt(i);
+  vy(i+1) = vy(i) + acc_n(2) * dt(i);
+  vz(i+1) = vz(i) + acc_n(3) * dt(1);
 
   #10 Determinacao das posicaes
   rx(i+1) = rx(i) + vx(i+1) * dt(i);
@@ -91,6 +95,36 @@ for i = 1 : m
 
   time(i+1) = time(i) + dt(i);
 endfor
+
+ep2 = e^2/(1-e^2);
+b = a*sqrt(1-e^2);
+
+R1 = [cosd(geodesica_ini(1)) , sind(geodesica_ini(1)) , 0 ;
+     -sind(geodesica_ini(1)) , cosd(geodesica_ini(1)) , 0 ;
+          0      ,     0      , 1 ];
+
+R2 = [-sind(geodesica_ini(2)) ,   0   ,  cosd(geodesica_ini(2)) ;
+                0             ,   1   ,           0             ;
+      -cosd(geodesica_ini(2)) ,   0   ,  -sind(geodesica_ini(2))];
+
+Re2n = R2*R1;
+ECEF_0 = [x0 ; y0 ; z0];
+ENU = [ ry(end) ; rx(end) ; -rz(end) ];
+
+ECEF_fin = Re2n'*ENU + ECEF_0;
+x = ECEF_fin(1);
+y = ECEF_fin(2);
+z = ECEF_fin(3);
+
+long_final = atan2d(y,x);
+P = sqrt(x^2 + y^2);
+theta_geof = atan2d(z*a,P*b);
+lat_final = atan2d((z + (ep2*b*(sind(theta_geof))^3)) , (P - (e^2*a*(cosd(theta_geof))^3)));
+N_final = a/sqrt(1 - (e^2*sind(lat_final))^2);
+
+h_final = P/cosd(lat_final) - N_final;
+
+aeroporto_final = [ lat_final ; long_final ; h_final ];
 
 # Plot posicao cartesiana
 figure;
@@ -103,7 +137,6 @@ ylabel('R_y (m)');
 subplot(3,1,3);
 plot(time,rz);
 ylabel('R_z (m)');
-
 
 
 
